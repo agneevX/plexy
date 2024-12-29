@@ -117,7 +117,7 @@ export const streamprops = ({
     addDebugOverlay: 0,
     directStreamAudio: 1,
     mediaBufferSize: 102400,
-    subtitles: "burn",
+    subtitles: "auto",
     "Accept-Language": "en",
     ...xprops(),
     ...(limitation.autoAdjustQuality && {

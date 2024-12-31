@@ -120,12 +120,16 @@ export const streamprops = ({
     subtitles: "auto",
     "Accept-Language": "en",
     ...xprops(),
-    ...(limitation.autoAdjustQuality && {
-      autoAdjustQuality: limitation.autoAdjustQuality ? 1 : 0,
-    }),
-    ...(limitation.maxVideoBitrate && {
-      maxVideoBitrate: limitation.maxVideoBitrate,
-    }),
+    ...(limitation.autoAdjustQuality
+      ? {
+          autoAdjustQuality: limitation.autoAdjustQuality ? 1 : 0,
+        }
+      : {}),
+    ...(limitation.maxVideoBitrate
+      ? {
+          maxVideoBitrate: limitation.maxVideoBitrate,
+        }
+      : {}),
   };
 };
 
@@ -512,16 +516,29 @@ export class ServerApi {
       ? _.shuffle(selections)
       : ([] as RecommendationShelf[]);
   }
-  static async random({ dir }: { dir: string }) {
+  static async random(
+    { dir }: { dir: string | string[] },
+    retries = 0,
+  ): Promise<Plex.Metadata | null> {
+    if (retries > 5) return null;
+    const key = Array.isArray(dir) ? _.sample(dir)! : dir;
+
     const dirs = await ServerApi.library({
-      key: dir,
+      key,
       directory: "genre",
     });
 
-    if (!dirs?.data.MediaContainer.Directory) return null;
+    if (!dirs?.data?.MediaContainer?.Directory) {
+      return await new Promise((resolve) => {
+        setTimeout(async () => {
+          const res = await ServerApi.random({ dir }, retries + 1);
+          resolve(res);
+        }, 250);
+      });
+    }
 
     const items = await ServerApi.library({
-      key: dir,
+      key,
       directory: `all?genre=${_.sample(dirs.data.MediaContainer.Directory)!.key}`,
     });
 
@@ -541,7 +558,14 @@ export class ServerApi {
   }) {
     return await axios
       .get(
-        `${localStorage.getItem("server")}/video/:/transcode/universal/decision?${qs.stringify(streamprops({ id, limitation }))}}`,
+        `${localStorage.getItem("server")}/video/:/transcode/universal/decision?${qs.stringify(
+          {
+            ...streamprops({
+              id,
+              limitation,
+            }),
+          },
+        )}`,
         {
           headers: {
             "X-Plex-Token": localStorage.getItem("token") as string,
